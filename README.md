@@ -1,3 +1,13 @@
+- GitHub: https://github.com/gilad-bendor/subtitle-translator
+- Go to [subdl.com](https://subdl.com/subtitle/sd1300281/frasier)
+   and download something like `Frasier.S04.1080p.BluRay.Remux.DTS-HD.MA2.0.H.264-BTN`
+- Copy srt files to [src](src) folder
+- Run `npm install && node index.js`
+- Translated srt files at [res](res) folder
+
+
+
+
 <img width="762" alt="image" src="https://user-images.githubusercontent.com/16719720/222925676-227fd7a3-da34-4dd8-be34-7e5664a4e56b.png">
 
 # subtitle-translator

@@ -13,6 +13,7 @@ let subtitles = fs.readdirSync('./src')
 let supportExtensions = ['srt', 'vtt']
 for (let subtitleFile of subtitles) {
   if (!supportExtensions.includes(subtitleFile.split('.').pop())) continue
+  console.log(`\n\n==============================     ${subtitleFile}     ==============================\n`);
   let subtitle = fs.readFileSync(`./src/${subtitleFile}`, 'utf8')
   subtitle = parseSync(subtitle)
   subtitle = subtitle.filter(line => line.type === 'cue')
@@ -34,7 +35,7 @@ for (let subtitleFile of subtitles) {
           messages: [
             {
               role: "system",
-              content: `You are a program responsible for translating subtitles. Your task is to output the specified target language based on the input text. Please do not create the following subtitles on your own. Please do not output any text other than the translation. You will receive the subtitles as array that needs to be translated, as well as the previous translation results and next subtitle. If you need to merge the subtitles with the following line, simply repeat the translation. Please transliterate the person's name into the local language. Target language: ${config.TARGET_LANGUAGE}`
+              content: `You are a program responsible for translating subtitles. Your task is to output the specified target language based on the input text. Please do not create the following subtitles on your own. Please do not output any text other than the translation. You will receive the subtitles as array that needs to be translated, as well as the previous translation results and next subtitle. If you need to merge the subtitles with the following line, simply repeat the translation. Please transliterate the person's name into the local language. Target language: ${config.TARGET_LANGUAGE}. Never output anything other that is not ${config.TARGET_LANGUAGE}.`
             },
             ...previousSubtitles.slice(-4),
             {
