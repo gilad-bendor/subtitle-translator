@@ -12,7 +12,15 @@ const openai = new OpenAIApi(configuration);
 let subtitles = fs.readdirSync('./src')
 let supportExtensions = ['srt', 'vtt']
 for (let subtitleFile of subtitles) {
-  if (!supportExtensions.includes(subtitleFile.split('.').pop())) continue
+  if (!supportExtensions.includes(subtitleFile.split('.').pop())) {
+    console.log(`Skipping non-subtitle ${subtitleFile}`.gray);
+    continue
+  }
+  if (fs.statSync(`./res/${subtitleFile}`, { throwIfNoEntry: false })) {
+    console.log(`Skipping already translated ${subtitleFile}`.gray);
+    continue;
+  }
+
   console.log(`\n\n==============================     ${subtitleFile}     ==============================\n`);
   let subtitle = fs.readFileSync(`./src/${subtitleFile}`, 'utf8')
   subtitle = parseSync(subtitle)
