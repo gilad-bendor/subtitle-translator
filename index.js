@@ -4,6 +4,9 @@ import { Configuration, OpenAIApi } from 'openai'
 import { parseSync, stringifySync } from 'subtitle'
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'))
 
+const MIN_LENGTH_TO_CHECK = 5;
+const MAX_BAD_CHARS_RATIO = 0.2;
+
 const configuration = new Configuration({
   apiKey: config.OPENAI_API_KEY,
 });
@@ -28,53 +31,99 @@ for (let subtitleFile of subtitles) {
 
   let previousSubtitles = []
 
+  // Loop over all subtitles.
   for (let i = 0; i < subtitle.length; i++) {
-    // for (let i = 0; i < 10; i++) {
     let text = subtitle[i].data.text
     let input = { Input: text }
     if (subtitle[i + 1]) {
       input.Next = subtitle[i + 1].data.text
     }
-    let completion;
+    let temperature = 0;
+
+    // Call GPT for a single subtitle - with retries for non-hebrew translations.
+    let result;
     for (;;) {
+      // Call GPT for a single subtitle - with retries for GPT errors.
+      let completion;
+      for (;;) {
+        try {
+          completion = await openai.createChatCompletion({
+            model: "gpt-3.5-turbo",
+            temperature,
+            messages: [
+              {
+                role: "system",
+                content: `
+                    You are a program responsible for translating subtitles.
+                    Your task is to output the specified target language based on the input text.
+                    Please do not create the following subtitles on your own.
+                    Please do not output any text other than the translation.
+                    You will receive the subtitles as array that needs to be translated,
+                     as well as the previous translation results and next subtitle.
+                    If you need to merge the subtitles with the following line, simply repeat the translation.
+                    Please transliterate the person's name into the local language.
+                    Target language: ${config.TARGET_LANGUAGE}.
+                    Never output anything other that is not ${config.TARGET_LANGUAGE}.
+                  `.replace(/\s+/g, ' ').trim()
+              },
+              ...previousSubtitles.slice(-4),
+              {
+                role: "user",
+                content: JSON.stringify(input)
+              }
+            ],
+          }, {timeout: 60 * 1000});
+          break;
+        } catch (e) {
+          console.error(`Error:    ${e}`);
+          console.log('retrying...'.red);
+        }
+      }
+
+      result = completion.data.choices[0].message.content
       try {
-        completion = await openai.createChatCompletion({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: `You are a program responsible for translating subtitles. Your task is to output the specified target language based on the input text. Please do not create the following subtitles on your own. Please do not output any text other than the translation. You will receive the subtitles as array that needs to be translated, as well as the previous translation results and next subtitle. If you need to merge the subtitles with the following line, simply repeat the translation. Please transliterate the person's name into the local language. Target language: ${config.TARGET_LANGUAGE}. Never output anything other that is not ${config.TARGET_LANGUAGE}.`
-            },
-            ...previousSubtitles.slice(-4),
-            {
-              role: "user",
-              content: JSON.stringify(input)
-            }
-          ],
-        }, {timeout: 60 * 1000 });
+        result = JSON.parse(result).Input
+      } catch (e) {
+        try {
+          if (i > 0) {
+            console.warn(`Warning: not a JSON:    ${result}`.yellow);
+          }
+          result = result.match(/"Input":"(.*?)"/)[1]
+        } catch (e) {
+          if (i === 0) {
+            // First subtitle - no K-shots, the result is the full translation.
+          } else {
+            // Strange, response is not in the right format.
+            console.log('###'.red)
+            console.log(e.toString().red)
+            console.log(result.red)
+            console.log('###'.red)
+          }
+        }
+      }
+
+      // Make sure the translation is hebrew.
+      const badCharsRegExp = /[a-zA-Z]/g;
+      const resultWithoutTags = result.replace(/<[^>]*>/g, '');
+      const badCharsCount = resultWithoutTags.length - resultWithoutTags.replace(badCharsRegExp, '').length;
+      const badCharsRatio = badCharsCount / resultWithoutTags.length;
+      if ((resultWithoutTags.length < MIN_LENGTH_TO_CHECK) ||
+          (badCharsRatio < MAX_BAD_CHARS_RATIO)) {
+        // Translation is good (Hebrew).
         break;
-      } catch (e) {
-        console.error(`Error:    ${e}`);
-        console.log('retrying...'.red);
+      } else {
+        // Translation is bad (English).
+        console.error(`Bad chars ratio: ${badCharsRatio}. Retrying...\nTranslation: ${result.replace(/\n/g, '\n             ')}\n`.red);
+        temperature += 0.1;
       }
     }
-    let result = completion.data.choices[0].message.content
-    try {
-      result = JSON.parse(result).Input
-    } catch (e) {
-      try {
-        result = result.match(/"Input":"(.*?)"/)[1]
-      } catch (e) {
-        console.log('###'.red)
-        console.log(e.toString().red)
-        console.log(result.red)
-        console.log('###'.red)
-      }
-    }
+
+    // One subtitle is successfully translated.
     previousSubtitles.push({ role: "user", content: JSON.stringify(input) })
     previousSubtitles.push({ role: 'assistant', content: JSON.stringify({ ...input, Input: result }) })
     // console.log(`${subtitle[i].data.text}`.blue)
     subtitle[i].data.text = `${result}\n${text}`
+
     console.log(`-----------------`.gray)
     console.log(`${i + 1} / ${subtitle.length}`.gray)
     console.log(`${result}`.green)
