@@ -7,6 +7,7 @@ const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'))
 const MIN_LENGTH_TO_CHECK = 5;
 const MAX_BAD_CHARS_RATIO = 0.2;
 const MAX_REQUEST_RETRIES = 5;
+const FORBIDDEN_REGEXP = /[\u05b8\u05b9\u05b7\u05b0\u05b5\u05b6\u05bc]/u;  // Hebrew "nikud"
 
 const configuration = new Configuration({
   apiKey: config.OPENAI_API_KEY,
@@ -121,8 +122,13 @@ for (let subtitleFile of subtitles) {
       const resultWithoutTags = result.replace(/<[^>]*>/g, '');
       const badCharsCount = resultWithoutTags.length - resultWithoutTags.replace(badCharsRegExp, '').length;
       const badCharsRatio = badCharsCount / resultWithoutTags.length;
-      if ((resultWithoutTags.length < MIN_LENGTH_TO_CHECK) ||
-          (badCharsRatio < MAX_BAD_CHARS_RATIO)) {
+      if (
+          (!FORBIDDEN_REGEXP.test(result)) &&
+          (
+              (resultWithoutTags.length < MIN_LENGTH_TO_CHECK) ||
+              (badCharsRatio < MAX_BAD_CHARS_RATIO)
+          )
+      ) {
         // Translation is good (Hebrew).
         break;
       } else {
