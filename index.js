@@ -95,34 +95,42 @@ for (let subtitleFile of subtitles) {
         }
       }
 
-      result = completion.data.choices[0].message.content
-      try {
-        result = JSON.parse(result).Input
-      } catch (e) {
+      result = completion?.data?.choices?.[0]?.message?.content;
+      if (result === undefined) {
+        console.warn('Warning: GPT response problem (looking for "completion.data.choices[0].message.content").    completion.data=', completion?.data, "    completion.data.choices[0].message=", completion?.data?.choices?.[0]?.message);
+      } else {
         try {
-          if (i > 0) {
-            console.warn(`Warning: not a JSON:    ${result}`.yellow);
-          }
-          result = result.match(/"Input":"(.*?)"/)[1]
+          result = JSON.parse(result).Input
         } catch (e) {
-          if (i === 0) {
-            // First subtitle - no K-shots, the result is the full translation.
-          } else {
-            // Strange, response is not in the right format.
-            console.log('###'.red)
-            console.log(e.toString().red)
-            console.log(result.red)
-            console.log('###'.red)
+          try {
+            if (i > 0) {
+              console.warn(`Warning: not a JSON:    ${result}`.yellow);
+            }
+            result = result?.match(/"Input":"(.*?)"/)[1]
+          } catch (e) {
+            if (i === 0) {
+              // First subtitle - no K-shots, the result is the full translation.
+            } else {
+              // Strange, response is not in the right format.
+              console.log('###'.red)
+              console.log(e.toString().red)
+              console.log(result?.red)
+              console.log('###'.red)
+            }
           }
+        }
+        if (result === undefined) {
+          console.warn('Warning: GPT response problem (parse yield undefined). completion.data=', completion?.data, "    completion.data.choices[0].message=", completion?.data?.choices?.[0]?.message);
         }
       }
 
       // Make sure the translation is hebrew.
       const badCharsRegExp = /[a-zA-Z]/g;
-      const resultWithoutTags = result.replace(/<[^>]*>/g, '');
+      const resultWithoutTags = (result || '').replace(/<[^>]*>/g, '');
       const badCharsCount = resultWithoutTags.length - resultWithoutTags.replace(badCharsRegExp, '').length;
       const badCharsRatio = badCharsCount / resultWithoutTags.length;
       if (
+          (resultWithoutTags) &&
           (!FORBIDDEN_REGEXP.test(result)) &&
           (
               (resultWithoutTags.length < MIN_LENGTH_TO_CHECK) ||
@@ -147,7 +155,7 @@ for (let subtitleFile of subtitles) {
         temperature += 0.1;
         console.error('Request: '.red, request);
         console.error('Response: '.red, result);
-        console.error(`Bad chars ratio: ${badCharsRatio}. Retrying with temperature ${temperature}...\nTranslation: ${result.replace(/\n/g, '\n             ')}\n`.red);
+        console.error(`Bad chars ratio: ${badCharsRatio}. Retrying with temperature ${temperature}...\nTranslation: ${result?.replace(/\n/g, '\n             ')}\n`.red);
       }
     }
 
