@@ -21,11 +21,13 @@ await handleDir('./src', './res');
 async function handleDir(sourceDir, targetDir) {
   let subtitles = fs.readdirSync(sourceDir)
   for (let subtitleFile of subtitles) {
-    const stat = fs.statSync(`${sourceDir}/${subtitleFile}`, {throwIfNoEntry: true});
-    if (stat.isDirectory()) {
-      await handleDir(`${sourceDir}/${subtitleFile}`, `${targetDir}/${subtitleFile}`);
-    } else if (stat.isFile()) {
-      await handleFile(`${sourceDir}/${subtitleFile}`, `${targetDir}/${subtitleFile}`);
+    if (!subtitleFile.startsWith('_')) {
+      const stat = fs.statSync(`${sourceDir}/${subtitleFile}`, {throwIfNoEntry: true});
+      if (stat.isDirectory()) {
+        await handleDir(`${sourceDir}/${subtitleFile}`, `${targetDir}/${subtitleFile}`);
+      } else if (stat.isFile()) {
+        await handleFile(`${sourceDir}/${subtitleFile}`, `${targetDir}/${subtitleFile}`);
+      }
     }
   }
 }
@@ -67,7 +69,7 @@ async function handleFile(subtitleFile, targetFile) {
       let completion = undefined;
       for (; ;) {
         request = {
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o-mini",
           temperature,
           messages: [
             {
